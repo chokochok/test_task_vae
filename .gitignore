@@ -30,8 +30,6 @@ ENV/
 *.ipynb
 
 # Data
-data/
-datasets/
 *.zip
 *.tar
 *.tar.gz
@@ -52,13 +50,6 @@ generated_images/
 reconstructions/
 samples/
 
-# Plots and figures
-*.png
-*.jpg
-*.jpeg
-!examples/*.png
-!examples/*.jpg
-
 # Configs (optional - uncomment if you want to ignore local configs)
 # config_local.yaml
 # config_local.jsondata/
@@ -67,3 +58,9 @@ logs/
 wandb/
 __pycache__/
 *.ckpt
+
+data/celeba/*
+data/cifar-10-batches-py/*
+data/FashionMNIST/*
+data/raw/*
+data/processed/*
