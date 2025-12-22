@@ -1,0 +1,37 @@
+# configs/config.yaml
+
+defaults:
+  - _self_
+
+task_name: "vae_training"
+seed: 42
+
+# Training settings (PyTorch Lightning Trainer)
+trainer:
+  _target_: lightning.Trainer
+  max_epochs: 100
+  accelerator: "gpu"
+  devices: 1
+  precision: "16-mixed"  # Mixed precision for acceleration on RTX 30xx
+  gradient_clip_val: 0.5 # Requirement "Gradient clipping" for stability
+  check_val_every_n_epoch: 1
+  log_every_n_steps: 10
+
+# Data parameters
+data:
+  batch_size: 64
+  num_workers: 4
+  img_size: 64         # 64 for CelebA, 32 for CIFAR-10
+  dataset_name: "celeba" # Can be changed to "cifar10"
+
+# Model parameters (VAE)
+model:
+  latent_dim: 128
+  kl_coeff: 0.00025    # KL divergence weight
+  lr: 0.001
+  free_bits_threshold: 1.0 # Requirement "Free bits"
+
+# Logging
+logger:
+  project: "vae-project"
+  save_dir: "${hydra:runtime.cwd}/logs/"

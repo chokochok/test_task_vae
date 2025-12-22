@@ -1,0 +1,69 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Data
+data/
+datasets/
+*.zip
+*.tar
+*.tar.gz
+
+# Training outputs
+checkpoints/
+logs/
+outputs/
+runs/
+wandb/
+results/
+*.pth
+*.pt
+*.ckpt
+
+# Generated images
+generated_images/
+reconstructions/
+samples/
+
+# Plots and figures
+*.png
+*.jpg
+*.jpeg
+!examples/*.png
+!examples/*.jpg
+
+# Configs (optional - uncomment if you want to ignore local configs)
+# config_local.yaml
+# config_local.jsondata/
+
+logs/
+wandb/
+__pycache__/
+*.ckpt
