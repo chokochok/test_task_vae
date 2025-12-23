@@ -118,6 +118,9 @@ To view loss curves and generated image grids during training:
 ```bash
 tensorboard --logdir tb_logs
 ```
+```bash
+tensorboard --logdir tb_logs_without_checkpoints
+```
 
 ## 7. Future Work
 
