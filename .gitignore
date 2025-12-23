@@ -35,12 +35,6 @@ ENV/
 *.tar.gz
 
 # Training outputs
-checkpoints/
-logs/
-outputs/
-runs/
-wandb/
-results/
 *.pth
 *.pt
 *.ckpt
@@ -64,3 +58,5 @@ data/cifar-10-batches-py/*
 data/FashionMNIST/*
 data/raw/*
 data/processed/*
+tb_logs/*
+tb_logs_without_checkpoints/*

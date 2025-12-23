@@ -1,22 +1,59 @@
-project_name: "vae-project"
+project_name: "vae-baseline"
 seed: 42
 
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+
 data:
-  dataset_name: "celeba"  # Options: celeba, cifar10, fashion_mnist
+  dataset_name: "celeba"  # fashion_mnist, cifar10, celeba
   data_dir: "./data"
-  batch_size: 64
-  num_workers: 4
-  image_size: 64          # 64 for CelebA, 32 for CIFAR10, 28/32 for FashionMNIST
+  batch_size: 128
+  num_workers: 16
+  image_size: 64  # FashionMNIST (28 -> 32), CIFAR10 (32), CelebA (64)
+
 model:
-  latent_dim: 128
-  base_channels: 32       # Starting number of channels in Encoder
-  beta: 1.0               # KL-divergence weight (Beta-VAE)
-  input_channels: 3       # 3 for RGB, 1 for Grayscale
+  lr: 0.001
+
+  # --- 1. CONFIG FOR FASHION-MNIST (Simple) ---
+  # latent_dim: 32
+  # hidden_dims: [32, 64] 
+
+  # --- 2. CONFIG FOR CIFAR-10 (Medium) ---
+  # latent_dim: 256
+  # hidden_dims: [64, 128, 256, 512]
+
+  # --- 3. CONFIG FOR CELEBA (Complex) ---
+  latent_dim: 256
+  hidden_dims: [64, 128, 256, 512]
+
+  # KL Annealing parameters
+  kl_annealing: true
+  kl_start: 0.0
+  kl_end: 0.9
+  kl_warmup_epochs: 2
+  kl_annealing_epochs: 3
 
 trainer:
-  max_epochs: 50
-  learning_rate: 0.0005
+  max_epochs: 10
   accelerator: "gpu"
   devices: 1
   check_val_every_n_epoch: 1
-  log_every_n_steps: 10
+  
+  # Gradient clipping (Стабілізація)
+  gradient_clip_val: 0.1
+
+  # Weight decay (Регуляризація)
+  weight_decay: 0 
+  betas: [0.9, 0.999]
+
+  # Scheduler
+  use_scheduler: false
+  scheduler_patience: 3
+  scheduler_factor: 0.5
+  min_lr: 1e-6
+
+logger:
+  save_dir: "tb_logs"
+  name: "vae_annealing_clip_final"
