@@ -1,0 +1,13 @@
+input_channels: 1
+latent_dim: 128
+hidden_dims:
+- 32
+- 64
+- 128
+- 256
+image_size: 32
+lr: 0.001
+dataset_name: fashion_mnist
+data_dir: ./data
+batch_size: 128
+num_workers: 4

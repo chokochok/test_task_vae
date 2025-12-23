@@ -10,6 +10,8 @@ This repository contains a robust implementation of a Convolutional Variational 
 
 > **Note:** To reproduce the analysis below, download the logs from the link above, run `tensorboard --logdir tb_logs`, and toggle the specific versions mentioned in each section.
 
+> **New:** Added tb_logs_without_checkpoints to be able to upload metrics to GitHub. Run `tensorboard --logdir tb_logs_without_checkpoints`
+
 ## 1. Datasets & Preprocessing
 
 The architecture was stress-tested on three datasets to ensure scalability and robustness:

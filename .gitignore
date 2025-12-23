@@ -59,4 +59,3 @@ data/FashionMNIST/*
 data/raw/*
 data/processed/*
 tb_logs/*
-tb_logs_without_checkpoints/*

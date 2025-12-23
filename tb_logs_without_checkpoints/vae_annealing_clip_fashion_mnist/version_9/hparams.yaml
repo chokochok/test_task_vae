@@ -1,0 +1,23 @@
+input_channels: 1
+latent_dim: 32
+hidden_dims:
+- 32
+- 64
+image_size: 32
+lr: 0.001
+kl_annealing: true
+kl_start: 1.3
+kl_end: 1.3
+kl_annealing_epochs: 10
+weight_decay: 0
+betas:
+- 0.9
+- 0.999
+use_scheduler: false
+scheduler_patience: 3
+scheduler_factor: 0.5
+min_lr: 1.0e-06
+dataset_name: fashion_mnist
+data_dir: ./data
+batch_size: 128
+num_workers: 8
