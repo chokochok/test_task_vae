@@ -1,0 +1,54 @@
+project_name: "vae-baseline"
+seed: 42
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+
+data:
+  dataset_name: "cifar10"  # fashion_mnist, cifar10, celeba
+  data_dir: "./data"
+  batch_size: 256
+  num_workers: 8
+  image_size: 32  # FashionMNIST (28 -> 32), CIFAR10 (32), CelebA (64)
+
+model:
+  lr: 0.0005
+
+  latent_dim: 256
+  hidden_dims: [64, 128, 256]
+
+  loss_type: "L1"     # "MSE" or "L1"
+  use_resnet: true
+  perceptual_weight: 1.0
+
+  # KL Annealing parameters
+  kl_annealing: true
+  kl_start: 0.01
+  kl_end: 0.5
+  kl_warmup_epochs: 5
+  kl_annealing_epochs: 15
+
+trainer:
+  max_epochs: 50
+  accelerator: "gpu"
+  devices: 1
+  check_val_every_n_epoch: 1
+  
+  # Gradient clipping (Стабілізація)
+  gradient_clip_val: 0.1
+
+  # Weight decay (Регуляризація)
+  weight_decay: 0 
+  betas: [0.9, 0.999]
+
+  # Scheduler
+  use_scheduler: false
+  scheduler_patience: 3
+  scheduler_factor: 0.5
+  min_lr: 1e-6
+
+logger:
+  save_dir: "tb_logs"
+  name: "vae_cifar_opt"

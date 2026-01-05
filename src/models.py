@@ -2,13 +2,42 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import lightning as L
+import lpips
 
-class Encoder(nn.Module):
-    def __init__(self, input_channels: int, latent_dim: int, hidden_dims: list, image_size: int):
+# ==========================================
+# 1. RESNET BLOCKS
+# ==========================================
+
+class ResidualBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1):
+        super().__init__()
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_channels != out_channels:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(out_channels)
+            )
+
+        self.conv_block = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.SiLU(), 
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels)
+        )
+
+    def forward(self, x):
+        return F.silu(self.conv_block(x) + self.shortcut(x))
+
+# ==========================================
+# 2. ENCODERS
+# ==========================================
+
+class StandardEncoder(nn.Module):
+    def __init__(self, input_channels, latent_dim, hidden_dims, image_size):
         super().__init__()
         modules = []
         in_channels = input_channels
-        
         for h_dim in hidden_dims:
             modules.append(
                 nn.Sequential(
@@ -17,31 +46,61 @@ class Encoder(nn.Module):
                     nn.LeakyReLU())
             )
             in_channels = h_dim
-            
         self.encoder = nn.Sequential(*modules)
         self.feature_map_size = image_size // (2 ** len(hidden_dims))
+        if self.feature_map_size < 1:
+            self.feature_map_size = 1
         self.flatten_dim = hidden_dims[-1] * (self.feature_map_size ** 2)
-        
         self.fc_mu = nn.Linear(self.flatten_dim, latent_dim)
         self.fc_var = nn.Linear(self.flatten_dim, latent_dim)
 
     def forward(self, x):
         x = self.encoder(x)
         x = torch.flatten(x, start_dim=1)
-        mu = self.fc_mu(x)
-        log_var = self.fc_var(x)
-        return mu, log_var
+        return self.fc_mu(x), self.fc_var(x)
 
-class Decoder(nn.Module):
-    def __init__(self, latent_dim: int, output_channels: int, hidden_dims: list, image_size: int):
+class ResNetEncoder(nn.Module):
+    def __init__(self, input_channels, latent_dim, hidden_dims, image_size):
+        super().__init__()
+        modules = []
+        modules.append(
+            nn.Sequential(
+                nn.Conv2d(input_channels, hidden_dims[0], kernel_size=3, stride=1, padding=1),
+                nn.BatchNorm2d(hidden_dims[0]),
+                nn.SiLU()
+            )
+        )
+        in_channels = hidden_dims[0]
+        for h_dim in hidden_dims:
+            modules.append(ResidualBlock(in_channels, h_dim, stride=2))
+            in_channels = h_dim
+        self.encoder = nn.Sequential(*modules)
+        self.feature_map_size = image_size // (2 ** len(hidden_dims))
+        if self.feature_map_size < 1:
+            self.feature_map_size = 1
+        self.flatten_dim = hidden_dims[-1] * (self.feature_map_size ** 2)
+        self.fc_mu = nn.Linear(self.flatten_dim, latent_dim)
+        self.fc_var = nn.Linear(self.flatten_dim, latent_dim)
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = torch.flatten(x, start_dim=1)
+        return self.fc_mu(x), self.fc_var(x)
+
+# ==========================================
+# 3. DECODERS
+# ==========================================
+
+class StandardDecoder(nn.Module):
+    def __init__(self, latent_dim, output_channels, hidden_dims, image_size):
         super().__init__()
         self.hidden_dims = hidden_dims[::-1]
         self.image_size = image_size
         self.feature_map_size = image_size // (2 ** len(hidden_dims))
+        if self.feature_map_size < 1:
+            self.feature_map_size = 1
         self.flatten_dim = self.hidden_dims[0] * (self.feature_map_size ** 2)
-        
         self.decoder_input = nn.Linear(latent_dim, self.flatten_dim)
-        
         modules = []
         for i in range(len(self.hidden_dims) - 1):
             modules.append(
@@ -52,7 +111,6 @@ class Decoder(nn.Module):
                     nn.LeakyReLU())
             )
         self.decoder = nn.Sequential(*modules)
-        
         self.final_layer = nn.Sequential(
             nn.ConvTranspose2d(self.hidden_dims[-1], self.hidden_dims[-1],
                                kernel_size=3, stride=2, padding=1, output_padding=1),
@@ -71,6 +129,49 @@ class Decoder(nn.Module):
             x = F.interpolate(x, size=self.image_size, mode='bilinear', align_corners=False)
         return x
 
+class ResNetDecoder(nn.Module):
+    def __init__(self, latent_dim, output_channels, hidden_dims, image_size):
+        super().__init__()
+        self.hidden_dims = hidden_dims[::-1]
+        self.image_size = image_size
+        self.feature_map_size = image_size // (2 ** len(hidden_dims))
+        if self.feature_map_size < 1:
+            self.feature_map_size = 1
+        self.flatten_dim = self.hidden_dims[0] * (self.feature_map_size ** 2)
+        self.decoder_input = nn.Linear(latent_dim, self.flatten_dim)
+        modules = []
+        for i in range(len(self.hidden_dims) - 1):
+            modules.append(
+                nn.Sequential(
+                    nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
+                    ResidualBlock(self.hidden_dims[i], self.hidden_dims[i+1], stride=1)
+                )
+            )
+        modules.append(
+            nn.Sequential(
+                nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
+                ResidualBlock(self.hidden_dims[-1], self.hidden_dims[-1], stride=1)
+            )
+        )
+        self.decoder = nn.Sequential(*modules)
+        self.final_layer = nn.Sequential(
+            nn.Conv2d(self.hidden_dims[-1], output_channels, kernel_size=3, padding=1),
+            nn.Sigmoid() 
+        )
+
+    def forward(self, z):
+        x = self.decoder_input(z)
+        x = x.view(-1, self.hidden_dims[0], self.feature_map_size, self.feature_map_size)
+        x = self.decoder(x)
+        x = self.final_layer(x)
+        if x.shape[-1] != self.image_size:
+            x = F.interpolate(x, size=self.image_size, mode='bilinear', align_corners=False)
+        return x
+
+# ==========================================
+# 4. MAIN VAE CLASS
+# ==========================================
+
 class VAE(L.LightningModule):
     def __init__(
         self,
@@ -79,6 +180,11 @@ class VAE(L.LightningModule):
         hidden_dims: list = None,
         image_size: int = 32,
         lr: float = 1e-3,
+        
+        loss_type: str = "MSE", 
+        use_resnet: bool = False,
+        perceptual_weight: float = 0.0,
+        
         kl_annealing: bool = False,
         kl_start: float = 0.0,
         kl_end: float = 1.0,
@@ -98,14 +204,29 @@ class VAE(L.LightningModule):
         if hidden_dims is None:
             hidden_dims = [32, 64, 128, 256]
         
-        self.encoder = Encoder(input_channels, latent_dim, hidden_dims, image_size)
-        self.decoder = Decoder(latent_dim, input_channels, hidden_dims, image_size)
+        # --- ARCHITECTURE ---
+        if use_resnet:
+            print(">>> Using ResNet Architecture")
+            self.encoder = ResNetEncoder(input_channels, latent_dim, hidden_dims, image_size)
+            self.decoder = ResNetDecoder(latent_dim, input_channels, hidden_dims, image_size)
+        else:
+            print(">>> Using Standard Architecture")
+            self.encoder = StandardEncoder(input_channels, latent_dim, hidden_dims, image_size)
+            self.decoder = StandardDecoder(latent_dim, input_channels, hidden_dims, image_size)
+
+        # --- PERCEPTUAL LOSS SETUP ---
+        if perceptual_weight > 0:
+            print(f">>> LPIPS (VGG) Perceptual Loss Enabled (Weight: {perceptual_weight})")
+            self.lpips = lpips.LPIPS(net='vgg').eval()
+            for param in self.lpips.parameters():
+                param.requires_grad = False
+        else:
+            self.lpips = None
 
         self.current_beta = kl_end if not kl_annealing else kl_start
 
     def forward(self, x):
         mu, log_var = self.encoder(x)
-        # Clamping for stability (to avoid NaN)
         log_var = torch.clamp(log_var, min=-10, max=10)
         z = self.reparameterize(mu, log_var)
         recons = self.decoder(z)
@@ -119,55 +240,58 @@ class VAE(L.LightningModule):
         return mu
     
     def get_current_beta(self):
-        """
-        Logic:
-        1. Warmup: Beta = kl_start (for N epochs)
-        2. Annealing: Linear increase from start to end
-        3. Plateau: Beta = kl_end
-        """
-        # If annealing is disabled - return final value
         if not self.hparams.kl_annealing:
             return self.hparams.kl_end
-            
+        
         epoch = self.current_epoch
         warmup = self.hparams.kl_warmup_epochs
         annealing_len = self.hparams.kl_annealing_epochs
         start = self.hparams.kl_start
         end = self.hparams.kl_end
         
-        # STAGE 1: WARMUP (Keep start, usually 0.0)
         if epoch < warmup:
             return start
-            
-        # STAGE 3: PLATEAU (Already finished annealing)
         if epoch >= (warmup + annealing_len):
             return end
         
-        # STAGE 2: ANNEALING (Linear growth)
-        # Calculate how many epochs passed FROM the end of warmup
         steps_in_annealing = epoch - warmup
-        
-        # Linear interpolation
         slope = (end - start) / annealing_len
         return start + slope * steps_in_annealing
 
     def loss_function(self, recons, input_img, mu, log_var, beta=1.0):
-        """
-        Classic ELBO Loss = MSE (Sum) + Beta * KL (Sum)
-        """
-        # 1. Reconstruction (Sum over all pixels in batch)
-        recons_loss = F.mse_loss(recons, input_img, reduction='sum')
+        loss_type = self.hparams.loss_type.upper()
         
-        # 2. KL Divergence (Sum over latent dimensions and batch)
+        # 1. Pixel-wise Reconstruction (L1/MSE)
+        if loss_type == "L1":
+            pixel_loss = F.l1_loss(recons, input_img, reduction='sum')
+        else:
+            pixel_loss = F.mse_loss(recons, input_img, reduction='sum')
+        
+        # 2. Perceptual Loss (VGG)
+        p_loss = torch.tensor(0.0, device=self.device)
+        if self.lpips is not None:
+            # LPIPS очікує вхід у діапазоні [-1, 1]
+            # Наш VAE (Sigmoid) видає [0, 1].
+            # Перетворення: x_norm = x * 2 - 1
+            rec_norm = recons * 2 - 1
+            in_norm = input_img * 2 - 1
+            
+            # lpips.forward повертає тензор (batch, 1, 1, 1), тому беремо sum
+            lpips_val = self.lpips(rec_norm, in_norm)
+            p_loss = torch.sum(lpips_val)
+            
+            # Додаємо до загального лоссу з вагою
+            pixel_loss = pixel_loss + (self.hparams.perceptual_weight * p_loss)
+
+        # 3. KL Divergence
         kld_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
 
-        # Total Loss
-        loss = recons_loss + beta * kld_loss
+        # Total
+        loss = pixel_loss + beta * kld_loss
         
-        # Divide by batch_size only for logging, so numbers are readable
-        # and don't depend on batch size (64 or 128)
         batch_size = input_img.size(0)
-        return loss / batch_size, recons_loss / batch_size, kld_loss / batch_size
+        # Повертаємо нормалізовані значення для логування
+        return loss / batch_size, pixel_loss / batch_size, kld_loss / batch_size
 
     def training_step(self, batch, batch_idx):
         real_img, _ = batch

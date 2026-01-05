@@ -6,7 +6,7 @@ pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorc
 
 pip install -r requirements.txt
 # or
-# pip install lightning hydra-core wandb clean-fid matplotlib gdown tensorboard
+# pip install lightning hydra-core wandb clean-fid matplotlib gdown tensorboard lpips
 
 python -c "import torch; print(f'CUDA: {torch.version.cuda}'); print(f'GPU: {torch.cuda.get_device_name(0)}' if torch.cuda.is_available() else 'FAIL')"
 

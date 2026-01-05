@@ -146,3 +146,17 @@ vae_annealing_clip_celeba
 
 vae_annealing_clip_final_celeba
 0 бета 0.9 для кращої ідентичності
+
+cifar10 opt
+1 update config wider rather deeper
+2 SiLU + L1 loss
+3 ResNet (ResidualBlock + Upsample)
+4 up kl_end, resnet false
+5 more kl
+6 kl 0.5, resnet true
+7 kl 0.8
+8 increase latent and hidden
+9 no anneal kl 1.0
+10 11 test with different sizes
+12 vgg test
+13 14 vgg with resnet

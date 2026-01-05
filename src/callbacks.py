@@ -3,6 +3,7 @@ import torch
 import torchvision
 from lightning.pytorch.loggers import TensorBoardLogger
 
+
 class ImageLogCallback(L.Callback):
     def __init__(self, num_samples=8, log_every_n_epochs=1):
         super().__init__()
@@ -16,7 +17,7 @@ class ImageLogCallback(L.Callback):
         val_loader = trainer.datamodule.val_dataloader()
         batch = next(iter(val_loader))
         images, _ = batch
-        images = images.to(pl_module.device)[:self.num_samples]
+        images = images.to(pl_module.device)[: self.num_samples]
 
         pl_module.eval()
         with torch.no_grad():

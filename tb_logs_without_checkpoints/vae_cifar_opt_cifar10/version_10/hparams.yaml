@@ -1,0 +1,27 @@
+input_channels: 3
+latent_dim: 512
+hidden_dims:
+- 256
+- 512
+- 1024
+image_size: 32
+lr: 0.001
+loss_type: L1
+use_resnet: true
+kl_annealing: true
+kl_start: 0.0
+kl_end: 1.0
+kl_annealing_epochs: 0
+kl_warmup_epochs: 5
+weight_decay: 0
+betas:
+- 0.9
+- 0.999
+use_scheduler: false
+scheduler_patience: 3
+scheduler_factor: 0.5
+min_lr: 1.0e-06
+dataset_name: cifar10
+data_dir: ./data
+batch_size: 128
+num_workers: 16
